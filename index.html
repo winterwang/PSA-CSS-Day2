@@ -1,0 +1,1700 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>Propensity Score Analysis (PSA) – Day 2</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Chaochen Wang (CWAN)   Thomas Laurent (TLAU)" />
+    <link rel="stylesheet" href="xaringan-themer.css" type="text/css" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# Propensity Score Analysis (PSA) – Day 2
+### Chaochen Wang (CWAN) <br> Thomas Laurent (TLAU)
+### 2020-2-28 14:30~15:30 <span class="citation">@CSS</span>
+
+---
+
+
+
+
+# Recap
+
+We discussed about:
+
+- the causal inference framework under which that PSA was designed for; 
+
+- the assumptions required when consider using the PSA;
+
+    - No interference, Consistency, Conditional Exchangeability
+
+- ATE calculated through a stratification procedure. 
+
+---
+class: middle
+
+# Today 
+
+We will try to cover: 
+
+- Adjusting for PS in the model; 
+
+- Matching participants by PS; 
+
+- Inversely weighting the participants by their PS;
+
+&lt;!-- - Cautions and best guidelines to follow when reporting studies used PS.  --&gt;
+
+---
+class: middle
+
+## Regression Adjustment
+
+- Another approach of using PS is to **adjust** for the propensity score in a regression model.
+
+`$$E\{Y|X, p(\mathbf{C})\} = \alpha + \color{red}{\beta} X + \gamma p(\mathbf{C})$$`
+
+
+- `\(\color{red}{\beta}\)` potentially has a **causal (conditional) interpretation**
+
+    - because if conditional exchangeability holds given `\(\mathbf{C}\)` then it also holds given `\(p(\mathbf{C})\)`
+    
+- `\(\gamma\)` is now one-dimensional so, **finite sample bias** would no longer be a problem.
+
+
+  
+---
+class: inverse
+background-image: url("./fig/adjustment.png")
+background-position: 50% 50%
+background-size: contain
+
+
+???
+
+finite sample bias is no longer a concern for propensity score adjustment as the number of covariates increases. 
+
+
+---
+class: middle
+
+## Matching on the estimated PS
+
+Matching on the PS means we take one patient who recieved RFA and find one (or more than one) match for him/her **with replacement** from those who recieved standard surgery but with a similar value of PS.
+
+- To estimate **average treatment effect in the treated (ATT)**;
+
+
+- If we start matching with those who recieved standard surgery, this will be an estimate of the **average treatment effect in the untreated (ATU)**.
+
+
+---
+class: middle
+
+## Matching methods
+
+- nearest neightbour matching
+
+- within calipers method (Mahalanobis metric matching)
+
+- etc.
+
+- Problem of **poor overlap (or lack of positivity)** is immediately flagged up when some individuals fail to be mached. 
+
+---
+class: middle
+
+## Balance diagnostics after matching
+
+- [Standardized mean difference (SMD)](https://cran.r-project.org/web/packages/tableone/vignettes/smd.html) is mostly used: 
+
+`$$SMD = \frac{\bar{X_1} - \bar{X_2}}{\sqrt{(\hat{\sigma_1}^2 + \hat{\sigma_2}^2)/2}} &lt;0.1$$`
+
+- For dichotomous variables and categorical variable, see reference &lt;sup&gt;1&lt;/sup&gt;: 
+
+.between[
+Yang DS, Dalton JE. A Unified Approach to Measuring the Effect Size Between Two Groups Using SAS. SAS Global Forum 2012. paper 335
+]
+
+---
+class: middle
+
+## Inverse probability weighting (1)
+
+- The propensity scores we have calculated are the **conditional probabilities** - based on all of the confounders we have found and included - that the individuals will be exposed. 
+
+- So there are some individuals, who, condition on their confounders, are more or less likely to be exposed. 
+
+---
+class: middle 
+
+## Inverse probability weighting (2)
+
+- If we found that someone in the study, condition on her/his all available confounders, was **unlikely** to be exposed to the intervention (treatment), `\(p(\mathbf{C})\)` is small.
+
+--
+- We may consider **upweight** him/her, so that (s)he represents him/her and also many other who may like him/her who were unlikely to be unexposed.
+
+--
+- Then we will have a re-weighted dataset in which `\(\mathbf{X}\)` (exposure), and `\(p(\mathbf{C})\)` are independent, but everything else is unchanged. 
+
+
+---
+class: middle 
+
+## Simple example (1)
+
+- Suppose the counterfactual data are:
+
+|      Group     | A | A | A | B | B | B | D | D | D |
+|:--------------:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|:-:|
+| Response `\(Y(1)\)`: | 1 | 1 | 1 | 2 | 2 | 2 | 3 | 3 | 3 |
+| Response `\(Y(0)\)`: | 0 | 0 | 0 | 1 | 1 | 1 | 2 | 2 | 2 |
+
+- Even without fitting any model, we can tell that the average treatment effect (ATE) is 1. 
+
+---
+class: middle
+
+## Simple example (2)
+
+- However, we can only observe (in the real world under consistency):
+
+|     Group    |  A |  A |  A |  B |  B |  B |  D |  D |  D |
+|:------------:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+|  Exposed `\(Y\)`:  |  1 |  1 | NA | NA |  2 | NA |  3 | NA | NA |
+| Unexposed `\(Y\)`: | NA | NA |  0 |  1 | NA |  1 | NA |  2 |  2 |
+
+
+- The estimated average treatment effect (ATE) is &lt;br&gt; 7/4 - 6/5 = 0.55, **(hugely biased)**
+
+
+---
+class: middle
+
+## Weighting to reduce bias (IPTW)
+
+- The probability of recieving treatment: 
+
+  - 2/3 in group A; 
+  - 1/3 in group B;
+  - 1/3 in group D.
+
+- Calculate weighted average &lt;br&gt; (by **1/{Probability of observed treament}**)
+
+
+.small[
+`$$\frac{(1 + 1) \times \frac{3}{2} + (2) \times \frac{3}{1} + (3) \times \frac{3}{1}}{\frac{3}{2} + \frac{3}{2} + \frac{3}{1} + \frac{3}{1}} \\ \;\;\;\;- \frac{(0) \times \frac{3}{1} + (1 + 1) \times \frac{3}{2} + (2 + 2) \times \frac{3}{2}}{\frac{3}{1} + \frac{3}{2}+ \frac{3}{2}+ \frac{3}{2}}= 2-1 = 1$$`
+]
+
+---
+class: middle
+
+## **I**nverse **P**robability of **T**reatment **W**eighting (IPTW)
+
+- IPTW successfully removed the bias by creating a "fake" population where we 'observe' each subject at each exposure level.
+
+- It can be proved that IPTW can provide consistent estimators. 
+
+---
+class: middle
+
+## IPTW conditioning on binary confounder C (1)
+
+.pull-left[
+- Observed data: 
+
+&lt;style type="text/css"&gt;
+.tg  {border-collapse:collapse;border-spacing:0;border-width:1px;border-style:solid;border-color:#ccc;}
+.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-color:#ccc;color:#333;background-color:#fff;}
+.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-color:#ccc;color:#333;background-color:#f0f0f0;}
+.tg .tg-p0ii{background-color:#f9f9f9;font-size:22px;border-color:inherit;text-align:center;vertical-align:top}
+.tg .tg-9d8n{font-size:22px;border-color:inherit;text-align:center;vertical-align:top}
+&lt;/style&gt;
+&lt;table class="tg"&gt;
+  &lt;tr&gt;
+    &lt;th class="tg-9d8n"&gt;&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt;Y = 1&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt;Y = 0&lt;/th&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;C = 0&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;C = 0&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;X = 1&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;180&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;200&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;600&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;200&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;X = 0&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;20&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;200&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;200&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;600&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;
+]
+
+
+
+.pull-right[
+- Table of `\(\color{red}{P(X|C)}\)` 
+
+&lt;style type="text/css"&gt;
+.tg  {border-collapse:collapse;border-spacing:0;border-width:1px;border-style:solid;border-color:#ccc;}
+.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-color:#ccc;color:#333;background-color:#fff;}
+.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-color:#ccc;color:#333;background-color:#f0f0f0;}
+.tg .tg-p0ii{background-color:#f9f9f9;font-size:22px;border-color:inherit;text-align:center;vertical-align:top}
+.tg .tg-9d8n{font-size:22px;border-color:inherit;text-align:center;vertical-align:top}
+&lt;/style&gt;
+&lt;table class="tg"&gt;
+  &lt;tr&gt;
+    &lt;th class="tg-9d8n"&gt;&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt;Y = 1&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt;Y = 0&lt;/th&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;C = 0&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;C = 0&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;X = 1&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;0.780&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;0.333&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;0.780&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;0.333&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;X = 0&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;0.220&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;0.667&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;0.220&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;0.667&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;
+
+]
+
+Where, `\(0.780 = (180 + 600)/(180 + 600 + 20 + 200)\)`
+
+
+---
+class: middle 
+## IPTW conditioning on binary confounder C (2)
+
+- Dividing each cell count by `\(\color{red}{P(X|C)}\)` 
+
+&lt;style type="text/css"&gt;
+.tg  {border-collapse:collapse;border-spacing:0;border-width:1px;border-style:solid;border-color:#ccc;}
+.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-color:#ccc;color:#333;background-color:#fff;}
+.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-color:#ccc;color:#333;background-color:#f0f0f0;}
+.tg .tg-p0ii{background-color:#f9f9f9;font-size:22px;border-color:inherit;text-align:center;vertical-align:top}
+.tg .tg-9d8n{font-size:22px;border-color:inherit;text-align:center;vertical-align:top}
+&lt;/style&gt;
+&lt;table class="tg"&gt;
+  &lt;tr&gt;
+    &lt;th class="tg-9d8n"&gt;&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt;Y = 1&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt;Y = 0&lt;/th&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;C = 0&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;C = 0&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;X = 1&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;180/0.78 &lt;br&gt;= 231&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;200/0.333 &lt;br&gt;= 600&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;600/0.78 &lt;br&gt;= 769&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;200/0.333 &lt;br&gt;= 600&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;X = 0&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;20/0.22 &lt;br&gt;= 91&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;200/0.667 &lt;br&gt;= 300&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;200/0.22 &lt;br&gt;= 909&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;600/0.667 &lt;br&gt;= 900&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;
+
+---
+class: middle
+## IPTW conditioning on binary confounder C (3)
+
+- The impact of inverse weighting by `\(\color{red}{P(X|C)}\)` is to create a pseudo(fake)-population where we 'observe' each subject at each exposure level: 
+
+&lt;style type="text/css"&gt;
+.tg  {border-collapse:collapse;border-spacing:0;border-width:1px;border-style:solid;border-color:#ccc;}
+.tg td{font-family:Arial, sans-serif;font-size:14px;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-color:#ccc;color:#333;background-color:#fff;}
+.tg th{font-family:Arial, sans-serif;font-size:14px;font-weight:normal;padding:10px 5px;border-style:solid;border-width:0px;overflow:hidden;word-break:normal;border-color:#ccc;color:#333;background-color:#f0f0f0;}
+.tg .tg-p0ii{background-color:#f9f9f9;font-size:22px;border-color:inherit;text-align:center;vertical-align:top}
+.tg .tg-390v{background-color:#f8ff00;font-size:22px;border-color:inherit;text-align:left;vertical-align:top}
+.tg .tg-9d8n{font-size:22px;border-color:inherit;text-align:center;vertical-align:top}
+.tg .tg-0pky{border-color:inherit;text-align:left;vertical-align:top}
+.tg .tg-ovs6{font-size:22px;background-color:#f8ff00;border-color:inherit;text-align:left;vertical-align:top}
+&lt;/style&gt;
+&lt;table class="tg"&gt;
+  &lt;tr&gt;
+    &lt;th class="tg-9d8n"&gt;&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt;Y = 1&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt;Y = 0&lt;/th&gt;
+    &lt;th class="tg-9d8n" colspan="2"&gt; Total &lt;/th&gt;
+    &lt;!-- &lt;th class="tg-0pky"&gt;&lt;/th&gt; --&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;C = 0&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;C = 0&lt;/td&gt;
+    &lt;td class="tg-390v"&gt;C = 1&lt;/td&gt;
+    &lt;td class="tg-ovs6"&gt;C = 0&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;X = 1&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;231&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;600&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;769&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;600&lt;/td&gt;
+    &lt;td class="tg-390v"&gt;1000&lt;/td&gt;
+    &lt;td class="tg-ovs6"&gt;1200&lt;/td&gt;
+  &lt;/tr&gt;
+  &lt;tr&gt;
+    &lt;td class="tg-9d8n"&gt;X = 0&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;91&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;300&lt;/td&gt;
+    &lt;td class="tg-p0ii"&gt;909&lt;/td&gt;
+    &lt;td class="tg-9d8n"&gt;900&lt;/td&gt;
+    &lt;td class="tg-390v"&gt;1000&lt;/td&gt;
+    &lt;td class="tg-ovs6"&gt;1200&lt;/td&gt;
+  &lt;/tr&gt;
+&lt;/table&gt;
+
+---
+class: middle
+
+# PS matching and IPTW example - data
+
+- Right heart catheterization data
+
+- We can download the data from : [http://biostat.mc.vanderbilt.edu/wiki/Main/DataSets](http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.csv)
+
+- Data are from ICU patients in 5 hospitals
+
+- **Treatment**: right heart catheterization (rhc) or not
+
+- **Outcome**: death
+
+- **Confounders**: demographics, insurance, disease diagnoses, etc.
+
+???
+catheterization: カテーテル
+&lt;!-- (https://www.coursera.org/lecture/crash-course-in-causality/data-example-in-r-Ie48W) --&gt;
+
+
+---
+class: middle
+
+## First steps &lt;br&gt;- load packages, read in data
+
+
+```r
+# load packages
+library(tableone)
+library(Matching)
+
+# Read in data
+load(url("http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.sav"))
+```
+
+
+---
+class: middle
+
+## Second steps - create data set
+
+.small[
+
+```r
+# create a data set with just these variables, for simplicity
+library(tidyverse) # load this package if you have not
+
+dat &lt;- rhc %&gt;% 
+  dplyr::select(cat1, sex, death, age, swang1, meanbp1) %&gt;% 
+  mutate(ARF = as.numeric(cat1 == "ARF"), 
+         CHF = as.numeric(cat1 == "CHF"), 
+         Cirr = as.numeric(cat1 == "Cirrhosis"), 
+         colcan = as.numeric(cat1 == "Colon Cancer"), 
+         Coma = as.numeric(cat1 == "Coma"), 
+         COPD = as.numeric(cat1 == "COPD"), 
+         lungcan = as.numeric(cat1 == "Lung Cancer"), 
+         MOSF = as.numeric(cat1 == "MOSF w/Malignancy"), 
+         sepsis = as.numeric(cat1 == "MOSF w/Sepsis"), 
+         female = as.numeric(sex == "Female"), 
+         died = as.numeric(death == "Yes"), 
+         treatment = as.numeric(swang1 == "RHC"), 
+         age = as.numeric(age), 
+         meanbp1 = as.numeric(meanbp1))
+```
+]
+
+
+---
+class: middle 
+
+## Continued
+
+.small[
+
+```r
+# Covariates will be used: 
+xvars &lt;- c("ARF", "CHF", "Cirr", "colcan", "Coma", "lungcan", "MOSF", 
+           "sepsis", "age", "female", "meanbp1")
+```
+]
+
+### Create a Table 1
+
+.small[
+
+```r
+# Look at a table 1
+
+table1 &lt;- CreateTableOne(vars = xvars, strata = "treatment", 
+                         data = dat, test = FALSE)
+
+# include standardized mean difference (SMD)
+print(table1, smd = TRUE)
+```
+]
+
+---
+class: middle
+
+### Table 1, unmatched
+
+.small[
+```r
+                     Stratified by treatment
+                      0             1             SMD   
+  n                    3551          2184               
+  ARF (mean (SD))      0.45 (0.50)   0.42 (0.49)   0.059
+  CHF (mean (SD))      0.07 (0.25)   0.10 (0.29)   0.095
+* Cirr (mean (SD))     0.05 (0.22)   0.02 (0.15)   0.145
+  colcan (mean (SD))   0.00 (0.04)   0.00 (0.02)   0.038
+* Coma (mean (SD))     0.10 (0.29)   0.04 (0.20)   0.207
+  lungcan (mean (SD))  0.01 (0.10)   0.00 (0.05)   0.095
+  MOSF (mean (SD))     0.07 (0.25)   0.07 (0.26)   0.018
+* sepsis (mean (SD))   0.15 (0.36)   0.32 (0.47)   0.415
+  age (mean (SD))     61.76 (17.29) 60.75 (15.63)  0.061
+  female (mean (SD))   0.46 (0.50)   0.41 (0.49)   0.093
+* meanbp1 (mean (SD)) 84.87 (38.87) 68.20 (34.24)  0.455
+```
+]
+
+
+???
+
+- A few variables showed some imbalanced. (SMD &gt; 0.1)
+
+
+---
+class: middle
+
+### Match
+
+- Greedy matching based on [Mahalanobis distance](https://ja.wikipedia.org/wiki/%E3%83%9E%E3%83%8F%E3%83%A9%E3%83%8E%E3%83%93%E3%82%B9%E8%B7%9D%E9%9B%A2) 
+
+.small[
+
+```r
+# do greedy matching
+greedymatch &lt;- Match(Tr = dat$treatment, 
+                     M = 1, # 1:1
+                     X = dat[xvars])
+
+matched &lt;- dat[unlist(greedymatch[c("index.treated", "index.control")]), ]
+matchedtab1 &lt;- CreateTableOne(vars = xvars, strata = "treatment", 
+                              data = matched, test = FALSE)
+
+print(matchedtab1, smd = TRUE)
+```
+]
+
+---
+class: middle
+
+### Matched data Table 1
+
+.small[
+```r
+                     Stratified by treatment
+                      0             1             SMD   
+  n                    2186          2186               
+  ARF (mean (SD))      0.42 (0.49)   0.42 (0.49)  &lt;0.001
+  CHF (mean (SD))      0.10 (0.29)   0.10 (0.29)  &lt;0.001
+  Cirr (mean (SD))     0.02 (0.15)   0.02 (0.15)  &lt;0.001
+  colcan (mean (SD))   0.00 (0.02)   0.00 (0.02)  &lt;0.001
+  Coma (mean (SD))     0.04 (0.20)   0.04 (0.20)  &lt;0.001
+  lungcan (mean (SD))  0.00 (0.05)   0.00 (0.05)  &lt;0.001
+  MOSF (mean (SD))     0.07 (0.26)   0.07 (0.26)  &lt;0.001
+  sepsis (mean (SD))   0.32 (0.47)   0.32 (0.47)  &lt;0.001
+  age (mean (SD))     60.84 (15.54) 60.77 (15.64)  0.005
+  female (mean (SD))   0.41 (0.49)   0.41 (0.49)  &lt;0.001
+  meanbp1 (mean (SD)) 68.26 (33.23) 68.19 (34.23)  0.002
+```
+]
+
+---
+class: middle
+
+### Outcome analysis -  causal risk difference&lt;br&gt;by simply performing a paired t-test
+
+.small[
+
+]
+
+.small[
+
+```r
+# outcome analysis
+y_trt &lt;- matched$died[matched$treatment == 1]
+y_con &lt;- matched$died[matched$treatment == 0]
+
+# pairwise difference
+diffy &lt;- y_trt - y_con
+
+# paired t-test
+t.test(diffy)
+```
+
+```
+## 
+## 	One Sample t-test
+## 
+## data:  diffy
+## t = 3.3318, df = 2185, p-value = 0.0008773
+## alternative hypothesis: true mean is not equal to 0
+## 95 percent confidence interval:
+##  0.01863193 0.07194447
+## sample estimates:
+## mean of x 
+## 0.0452882
+```
+]
+
+---
+class: middle
+
+### Causal risk difference - summary
+
+- Point estimate: 0.045
+
+    - Difference in probability of death **if everyone received RHC** compared with **if no one recieved RHC** is 0.045 (i.e., higher risk of death in RHC group)
+
+- 95% CI: (0.019, 0.072)
+
+- P-value: &lt; 0.001
+
+- don't take it too seriously, this is just for illustration, we have not controlled for all of the confounders. 
+
+---
+class: middle
+
+### McNemar test
+
+.small[
+
+```r
+# McNemar test
+
+table(y_trt, y_con)
+```
+
+```
+##      y_con
+## y_trt   0   1
+##     0 305 394
+##     1 493 994
+```
+
+```r
+mcnemar.test(matrix(c(994, 493, 394, 305), 2, 2))
+```
+
+```
+## 
+## 	McNemar's Chi-squared test with continuity correction
+## 
+## data:  matrix(c(994, 493, 394, 305), 2, 2)
+## McNemar's chi-squared = 10.828, df = 1, p-value = 0.001
+```
+]
+
+
+---
+class: middle
+
+### McNemar test - summary
+
+- 493 + 394 pairs are discordant
+
+- 493 means when a treated person died and a control person did not
+
+- P value &lt; 0.001 
+
+- Same conclusion from the paried t-test &lt;br&gt;-- treated persons were at higher risk of death
+
+
+---
+class: middle
+
+# IPTW - example using the same data
+
+- load packages, read in data
+
+.small[
+
+```r
+# load packages
+library(tableone)
+*library(sandwich)
+    # for robust variance estimation
+*library(ipw)
+*library(survey)
+
+# Read in data
+load(url("http://biostat.mc.vanderbilt.edu/wiki/pub/Main/DataSets/rhc.sav"))
+```
+]
+
+---
+class: middle
+
+## Calculate the propensity score
+
+.small[
+
+]
+
+.small[
+
+```r
+# propensity score model
+psmodel &lt;- glm(treatment ~ age + female + meanbp1 + ARF + 
+                 CHF + Cirr + colcan + Coma + lungcan + 
+                 MOSF + sepsis + aps, 
+               family = binomial(link = "logit"), 
+               data = dat)
+
+# value of propensity score for each subject
+ps &lt;- predict(psmodel, type = "response")
+```
+]
+
+---
+class: middle
+
+## Results from the PS model
+
+.small[
+```r
+Coefficients:
+             Estimate Std. Error z value Pr(&gt;|z|)    
+(Intercept) -1.946015   0.232129   -8.38  &lt; 2e-16 ***
+*age         -0.003047   0.001746   -1.74  0.08101 .  
+*female      -0.139077   0.059014   -2.36  0.01844 *  
+*meanbp1     -0.007517   0.000871   -8.63  &lt; 2e-16 ***
+*ARF          1.225293   0.149551    8.19  2.5e-16 ***
+*CHF          1.890564   0.173569   10.89  &lt; 2e-16 ***
+Cirr         0.433406   0.220337    1.97  0.04918 *  
+colcan       0.048157   1.124289    0.04  0.96583    
+*Coma         0.684254   0.187833    3.64  0.00027 ***
+lungcan      0.198460   0.505500    0.39  0.69461    
+*MOSF         1.017780   0.180716    5.63  1.8e-08 ***
+*sepsis       1.840246   0.156159   11.78  &lt; 2e-16 ***
+*aps          0.018236   0.001729   10.55  &lt; 2e-16 ***
+---
+Signif. codes:  0 ‘***’ 0.001 ‘**’ 0.01 ‘*’ 0.05 ‘.’ 0.1 ‘ ’ 1
+
+(Dispersion parameter for binomial family taken to be 1)
+
+    Null deviance: 7621.4  on 5734  degrees of freedom
+Residual deviance: 6869.2  on 5722  degrees of freedom
+AIC: 6895
+
+Number of Fisher Scoring iterations: 4
+```
+]
+
+???
+You probably will be interested on which variables are associated with receiving the treatment in the data.
+
+- age negative coefficient
+
+
+---
+class: inverse
+background-image: url("./fig/rhcpreweighting.png")
+background-position: 50% 50%
+background-size: contain
+
+
+
+
+???
+good overlapping between two treatment groups
+
+
+---
+class: middle
+
+## Create weights and check balance
+
+.small[
+
+```r
+# Create weights
+dat &lt;- dat %&gt;% 
+  mutate(weight = if_else(treatment == 1, 1/(ps), 1/(1-ps)))
+
+# apply weights to data
+*weighteddata &lt;- svydesign(ids = ~1, data = dat, weights = ~ weight)
+
+# weighted table 1
+
+weightedtable &lt;- svyCreateTableOne(vars = xvars, strata = "treatment", 
+                                   data = weighteddata, test = FALSE)
+```
+]
+
+.small[
+
+```r
+## Show table with SMD
+
+print(weightedtable, smd = TRUE)
+```
+]
+
+
+---
+class: middle
+## Check balance
+
+- numbers in the brackets `()` are standard deviations but we can ignore them.
+
+.small[
+```r
+                    Stratified by treatment
+                      0               1               SMD   
+  n                   5760.80         5660.88               
+  ARF (mean (SD))        0.43 (0.50)     0.45 (0.50)   0.021
+  CHF (mean (SD))        0.08 (0.27)     0.08 (0.27)   0.001
+  Cirr (mean (SD))       0.04 (0.19)     0.04 (0.18)   0.017
+  colcan (mean (SD))     0.00 (0.04)     0.00 (0.06)   0.039
+  Coma (mean (SD))       0.07 (0.26)     0.07 (0.25)   0.025
+  lungcan (mean (SD))    0.01 (0.08)     0.01 (0.08)   0.010
+  MOSF (mean (SD))       0.07 (0.25)     0.07 (0.26)   0.008
+  sepsis (mean (SD))     0.22 (0.41)     0.22 (0.41)   0.004
+  age (mean (SD))       61.37 (17.59)   61.52 (15.22)  0.010
+  female (mean (SD))     0.44 (0.50)     0.44 (0.50)  &lt;0.001
+  meanbp1 (mean (SD))   78.28 (38.20)   78.14 (38.34)  0.004
+```
+]
+
+???
+
+because these standard deviations are based on the weighted data, 
+which shows as a weighted sample size. They are not real sample size so sd does not really mean anything.
+
+The means of the pseudo population is actually what we want. 
+
+You can see the weighted mean are very well balanced.
+
+
+---
+class: middle 
+
+## You can also get weighted mean in a hard way
+
+`$$\frac{\sum_{i = 1}^n I(A_i = 1) \frac{X_i}{\pi_i}}{\sum_{i = 1}^n \frac{I(A_i = 1)}{\pi_i}}$$`
+
+.small[
+
+```r
+dat %&gt;% 
+  dplyr::filter(treatment == 1) %&gt;% 
+  dplyr::select(treatment, weight, age) %&gt;% 
+  mutate(WtedAge = mean(weight*age)/mean(weight)) 
+```
+
+```
+##     treatment    weight      age  WtedAge
+## 1           1  2.045829 78.17896 61.52427
+## 2           1  2.151275 46.09198 61.52427
+## 3           1  1.599472 67.90997 61.52427
+## 4           1  2.975337 48.42398 61.52427
+## 5           1  2.481442 68.34796 61.52427
+## 6           1  1.820175 74.70996 61.52427
+## 7           1  2.319494 88.42200 61.52427
+## 8           1  2.295315 69.00195 61.52427
+## 9           1  1.534281 50.59000 61.52427
+## 10          1  3.403411 62.68900 61.52427
+## 11          1  1.989842 42.05298 61.52427
+## 12          1  4.403149 39.82999 61.52427
+## 13          1  1.594152 71.49597 61.52427
+## 14          1  1.873642 61.43997 61.52427
+## 15          1  2.329028 51.39999 61.52427
+## 16          1  1.756897 21.09200 61.52427
+## 17          1  2.699072 56.76898 61.52427
+## 18          1  1.637111 83.37000 61.52427
+## 19          1  2.808014 61.86697 61.52427
+## 20          1  2.467227 85.31995 61.52427
+## 21          1  3.386069 47.97498 61.52427
+## 22          1  2.483200 69.19098 61.52427
+## 23          1  3.536878 60.65399 61.52427
+## 24          1  2.018590 66.89398 61.52427
+## 25          1  1.380379 25.51399 61.52427
+## 26          1  1.449096 40.78000 61.52427
+## 27          1  3.636666 45.57397 61.52427
+## 28          1  2.440332 72.81897 61.52427
+## 29          1  2.902508 93.02399 61.52427
+## 30          1  4.186484 83.56195 61.52427
+## 31          1  1.293527 49.99899 61.52427
+## 32          1  1.487769 30.56499 61.52427
+## 33          1  1.707142 65.08099 61.52427
+## 34          1  3.442396 57.09198 61.52427
+## 35          1  2.249899 44.31998 61.52427
+## 36          1  2.756424 69.40198 61.52427
+## 37          1  6.518697 65.39600 61.52427
+## 38          1  1.460556 77.19397 61.52427
+## 39          1  1.427629 20.58899 61.52427
+## 40          1  2.362930 36.18100 61.52427
+## 41          1  1.789120 53.31400 61.52427
+## 42          1  2.198361 67.73700 61.52427
+## 43          1  2.609819 80.45697 61.52427
+## 44          1  2.190279 82.41998 61.52427
+## 45          1  2.840811 66.52698 61.52427
+## 46          1  2.135723 44.44397 61.52427
+## 47          1  1.931956 40.82098 61.52427
+## 48          1  1.583786 70.12695 61.52427
+## 49          1  2.670335 77.49799 61.52427
+## 50          1  3.328870 88.94495 61.52427
+## 51          1  2.367001 49.56097 61.52427
+## 52          1  2.372676 72.83795 61.52427
+## 53          1  2.544582 66.84497 61.52427
+## 54          1 16.254543 78.60394 61.52427
+## 55          1  5.396707 74.40094 61.52427
+## 56          1  1.887182 37.68900 61.52427
+## 57          1  1.761800 67.35699 61.52427
+## 58          1  1.755289 49.89499 61.52427
+## 59          1  2.706464 49.37698 61.52427
+## 60          1  1.778488 50.15500 61.52427
+## 61          1  2.127044 44.48199 61.52427
+## 62          1  1.587683 24.24100 61.52427
+## 63          1  2.083107 72.56097 61.52427
+## 64          1  2.085953 78.72095 61.52427
+## 65          1  3.020566 74.17395 61.52427
+## 66          1  1.688710 83.01996 61.52427
+## 67          1  1.823633 68.68994 61.52427
+## 68          1  1.570280 61.16098 61.52427
+## 69          1  2.768914 46.89099 61.52427
+## 70          1  2.111298 43.25000 61.52427
+## 71          1  2.299524 19.67400 61.52427
+## 72          1  3.944784 78.75696 61.52427
+## 73          1  1.749406 40.24899 61.52427
+## 74          1  2.695959 66.40900 61.52427
+## 75          1  5.015828 44.90900 61.52427
+## 76          1  1.587696 65.04895 61.52427
+## 77          1  1.546598 59.61899 61.52427
+## 78          1  1.967406 45.27597 61.52427
+## 79          1  3.003779 66.90997 61.52427
+## 80          1  1.958942 58.26700 61.52427
+## 81          1  2.011152 59.37598 61.52427
+## 82          1  4.969555 60.84097 61.52427
+## 83          1  1.474322 71.73700 61.52427
+## 84          1  2.174531 64.74194 61.52427
+## 85          1  3.885865 65.89996 61.52427
+## 86          1  1.644675 71.75598 61.52427
+## 87          1  5.836314 75.32098 61.52427
+## 88          1  3.864224 70.66095 61.52427
+## 89          1  2.195994 68.50397 61.52427
+## 90          1  2.046166 75.66095 61.52427
+## 91          1  3.309506 78.35699 61.52427
+## 92          1  1.457154 69.46198 61.52427
+## 93          1  1.952814 77.50000 61.52427
+## 94          1  1.509854 60.69498 61.52427
+## 95          1  2.488169 49.49197 61.52427
+## 96          1  3.916381 75.29395 61.52427
+## 97          1  1.530616 68.75299 61.52427
+## 98          1  3.393029 33.59097 61.52427
+## 99          1  1.842414 79.89600 61.52427
+## 100         1  1.824065 79.59198 61.52427
+## 101         1  1.915328 75.14899 61.52427
+## 102         1  3.178959 69.38300 61.52427
+## 103         1  3.371009 76.68396 61.52427
+## 104         1  1.521450 75.86597 61.52427
+## 105         1  1.572916 73.74896 61.52427
+## 106         1  3.361534 61.77399 61.52427
+## 107         1  2.762833 83.31299 61.52427
+## 108         1  4.002852 51.57300 61.52427
+## 109         1  2.443059 66.45599 61.52427
+## 110         1  2.093679 21.92699 61.52427
+## 111         1  1.619345 46.51898 61.52427
+## 112         1  2.682730 68.00000 61.52427
+## 113         1  2.444724 79.69098 61.52427
+## 114         1  2.915066 69.24597 61.52427
+## 115         1  1.674015 51.63599 61.52427
+## 116         1  2.131341 54.88599 61.52427
+## 117         1  5.324147 49.45099 61.52427
+## 118         1  2.479031 72.70398 61.52427
+## 119         1  2.114682 59.88498 61.52427
+## 120         1  2.778945 24.47899 61.52427
+## 121         1  1.716101 40.41898 61.52427
+## 122         1  3.386012 68.19995 61.52427
+## 123         1  1.940611 68.20294 61.52427
+## 124         1  1.607074 58.83600 61.52427
+## 125         1  1.881438 65.59595 61.52427
+## 126         1  5.795298 61.42398 61.52427
+## 127         1  2.315788 76.57996 61.52427
+## 128         1  2.093312 42.24799 61.52427
+## 129         1  5.158692 69.12500 61.52427
+## 130         1  1.559603 63.24399 61.52427
+## 131         1  6.908853 31.09900 61.52427
+## 132         1  1.779242 74.78699 61.52427
+## 133         1  1.910428 66.14600 61.52427
+## 134         1  2.864435 72.68195 61.52427
+## 135         1  1.487475 36.67398 61.52427
+## 136         1  1.903202 41.26498 61.52427
+## 137         1  6.204496 77.53595 61.52427
+## 138         1  1.853967 61.91898 61.52427
+## 139         1  6.672624 76.24896 61.52427
+## 140         1  2.411347 71.64099 61.52427
+## 141         1  2.009567 57.74698 61.52427
+## 142         1  3.685639 69.20197 61.52427
+## 143         1  1.883507 47.93198 61.52427
+## 144         1  2.573778 45.26797 61.52427
+## 145         1  1.426691 72.54999 61.52427
+## 146         1  1.468421 69.70599 61.52427
+## 147         1  1.550853 44.89499 61.52427
+## 148         1  1.684082 61.73297 61.52427
+## 149         1  2.424377 50.57599 61.52427
+## 150         1  2.787626 64.70398 61.52427
+## 151         1  1.454046 57.35498 61.52427
+## 152         1  1.603418 66.72095 61.52427
+## 153         1  2.933838 58.59799 61.52427
+## 154         1  1.215051 56.82397 61.52427
+## 155         1  1.674702 82.58197 61.52427
+## 156         1  1.866990 85.45099 61.52427
+## 157         1  1.344164 32.42697 61.52427
+## 158         1  1.463906 75.45795 61.52427
+## 159         1  1.930545 51.01398 61.52427
+## 160         1  1.900346 50.88599 61.52427
+## 161         1  2.712888 55.04700 61.52427
+## 162         1  1.593279 67.01196 61.52427
+## 163         1  4.768668 84.75800 61.52427
+## 164         1  2.144877 46.13300 61.52427
+## 165         1  2.082396 34.14398 61.52427
+## 166         1  1.455573 38.76498 61.52427
+## 167         1  2.280964 75.90698 61.52427
+## 168         1  2.196402 76.77997 61.52427
+## 169         1  2.368306 64.93097 61.52427
+## 170         1  1.766195 41.52197 61.52427
+## 171         1  1.590300 31.79700 61.52427
+## 172         1  2.664762 74.02295 61.52427
+## 173         1  2.086945 48.59097 61.52427
+## 174         1  2.565417 58.49100 61.52427
+## 175         1  1.533597 83.97797 61.52427
+## 176         1  1.890944 60.81299 61.52427
+## 177         1  5.237617 75.67999 61.52427
+## 178         1  1.543855 62.85797 61.52427
+## 179         1  2.257757 84.66498 61.52427
+## 180         1  5.262050 31.28299 61.52427
+## 181         1  3.994266 67.16998 61.52427
+## 182         1  4.644215 71.66296 61.52427
+## 183         1  1.506674 36.46298 61.52427
+## 184         1  3.079523 46.15500 61.52427
+## 185         1  1.384993 62.05298 61.52427
+## 186         1  2.648687 78.81995 61.52427
+## 187         1  1.432438 59.35098 61.52427
+## 188         1  2.238154 49.41498 61.52427
+## 189         1  6.705946 75.10699 61.52427
+## 190         1  4.282662 55.04700 61.52427
+## 191         1  1.603535 42.95697 61.52427
+## 192         1  3.972410 80.21899 61.52427
+## 193         1  1.779862 36.90298 61.52427
+## 194         1  3.591458 62.85300 61.52427
+## 195         1  1.745031 45.40698 61.52427
+## 196         1  1.773483 41.64499 61.52427
+## 197         1  2.061997 72.65997 61.52427
+## 198         1  2.865331 72.10999 61.52427
+## 199         1  5.888397 74.98999 61.52427
+## 200         1  4.093463 71.26099 61.52427
+## 201         1  2.227707 62.34399 61.52427
+## 202         1  1.462054 30.01500 61.52427
+## 203         1  4.270881 61.68698 61.52427
+## 204         1  2.327393 42.13599 61.52427
+## 205         1  2.926311 42.83398 61.52427
+## 206         1  2.101189 50.95099 61.52427
+## 207         1  2.274166 70.92694 61.52427
+## 208         1  2.621498 30.83400 61.52427
+## 209         1  2.041905 69.77698 61.52427
+## 210         1  1.387565 71.04199 61.52427
+## 211         1  1.993448 46.80099 61.52427
+## 212         1  2.415764 77.85895 61.52427
+## 213         1  1.677416 69.21594 61.52427
+## 214         1  1.498294 27.10699 61.52427
+## 215         1  3.427458 74.64795 61.52427
+## 216         1  1.955186 72.33099 61.52427
+## 217         1  3.096612 55.68799 61.52427
+## 218         1  1.861229 59.73999 61.52427
+## 219         1  1.812775 74.52399 61.52427
+## 220         1  1.629247 87.19196 61.52427
+## 221         1  1.742481 74.43896 61.52427
+## 222         1  2.343183 54.98199 61.52427
+## 223         1  3.379876 45.37198 61.52427
+## 224         1  1.364072 80.44397 61.52427
+## 225         1  2.051106 63.97800 61.52427
+## 226         1  2.592294 65.62396 61.52427
+## 227         1  2.195765 68.44098 61.52427
+## 228         1  1.417629 74.29700 61.52427
+## 229         1  1.432313 74.75397 61.52427
+## 230         1  1.743809 77.06000 61.52427
+## 231         1  3.330013 77.17694 61.52427
+## 232         1  1.688000 65.57697 61.52427
+## 233         1  1.321044 37.25098 61.52427
+## 234         1  2.304301 69.13300 61.52427
+## 235         1  1.810026 61.37198 61.52427
+## 236         1  1.660051 75.24396 61.52427
+## 237         1  1.642545 70.43695 61.52427
+## 238         1  1.968107 50.89398 61.52427
+## 239         1  2.067390 59.39798 61.52427
+## 240         1  3.670178 78.86896 61.52427
+## 241         1  1.796457 71.06396 61.52427
+## 242         1  1.361234 68.96899 61.52427
+## 243         1  6.053475 84.41595 61.52427
+## 244         1  1.762238 38.80399 61.52427
+## 245         1  2.602506 48.63797 61.52427
+## 246         1  4.101118 75.87695 61.52427
+## 247         1  1.702676 58.95398 61.52427
+## 248         1  2.351748 56.91998 61.52427
+## 249         1  1.614649 58.20398 61.52427
+## 250         1  1.881628 39.39200 61.52427
+##  [ reached 'max' / getOption("max.print") -- omitted 1934 rows ]
+```
+]
+
+---
+class: middle
+
+## Causal relative risk 
+  
+.small[
+
+```r
+# get causal relative risk, use weighted GLM 
+glm.obj &lt;- glm(died ~ treatment, weights = weight, 
+               data = dat, family = binomial(link = log))
+# summary(glm.obj)
+betaiptw &lt;- coef(glm.obj)
+# to properly account for weighting, use asymptotic (sandwich) variance
+
+SE &lt;- sqrt(diag(vcovHC(glm.obj, type = "HC0")))
+
+# Get the point estimate and confidence intervals
+causalrr &lt;- exp(betaiptw[2])
+lrr &lt;- exp(betaiptw[2] - 1.96*SE[2])
+urr &lt;- exp(betaiptw[2] + 1.96*SE[2])
+c(causalrr, lrr, urr)
+```
+
+```
+## treatment treatment treatment 
+##  1.045463  1.001730  1.091105
+```
+]
+
+???
+because the weights in the `glm` function will make the sample size bigger than it actually was, so robust/sandwich covariance can help us to correct that. 
+
+`vcovHC` gives us robust variance-covariance matrix
+
+`diag` keep the numbers in the diagonal 
+
+then take square root to calculate the standard error.
+
+---
+class: middle
+
+## Causal risk difference 
+
+.small[
+
+```r
+# get causal risk difference, use weighted GLM 
+glm.obj &lt;- glm(died ~ treatment, weights = weight, 
+               data = dat, family = binomial(link = "identity"))
+# summary(glm.obj)
+betaiptw &lt;- coef(glm.obj)
+SE &lt;- sqrt(diag(vcovHC(glm.obj, type = "HC0")))
+
+# causal risk difference
+causalrd &lt;- betaiptw[2]
+lrd &lt;- betaiptw[2]  - 1.96*SE[2]
+urd &lt;- betaiptw[2]  + 1.96*SE[2]
+c(causalrd, lrd, urd)
+```
+
+```
+##    treatment    treatment    treatment 
+## 0.0291199506 0.0009495498 0.0572903514
+```
+]
+
+---
+class: middle
+
+## Let's repeat using the `ipw` package
+
+.small[
+
+```r
+weightmodel &lt;- ipwpoint(exposure = treatment, 
+                        family = "binomial",
+                        link = "logit",
+                        denominator = ~ age + female + meanbp1 + ARF +
+                          CHF + Cirr + colcan + Coma + lungcan + MOSF + 
+                          sepsis + aps, data = dat)
+
+summary(weightmodel$ipw.weights)
+```
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   1.051   1.374   1.682   1.992   2.238  17.301
+```
+]
+
+
+.small[
+
+```r
+# get the density plot easily
+ipwplot(weights = weightmodel$ipw.weights, logscale = FALSE,
+        main = "Weights", xlim = c(0, 18))
+```
+
+]
+
+---
+class: inverse
+background-image: url("./fig/densityplotWeights.png")
+background-position: 50% 50%
+background-size: contain
+
+???
+this figure is showing the distribution of the weights. 
+
+
+---
+class: middle
+
+## Get causal risk difference 
+
+.small[
+
+```r
+# causal risk difference using survey designed glm
+svyglm.obj &lt;- (svyglm(died ~ treatment, 
+                      design = svydesign(~ 1, weights = ~weight, data = dat)))
+
+coef(svyglm.obj)
+```
+
+```
+## (Intercept)   treatment 
+##  0.64051861  0.02911995
+```
+
+```r
+confint(svyglm.obj)
+```
+
+```
+##                    2.5 %     97.5 %
+## (Intercept) 0.6240514538 0.65698576
+## treatment   0.0009476112 0.05729229
+```
+]
+
+---
+class: middle
+
+## Truncated weights 
+
+.small[
+```r
+weight &lt;- dat$weight
+truncweight &lt;- replace(weight, weight &gt; 15, 15)
+# causal risk difference
+glm.obj &lt;- glm(died ~ treatment, weights = truncweight, 
+               family = binomial(link = "identity"), 
+               data = dat)
+
+# truncated weights use ipw package
+weightmodel &lt;- ipwpoint(exposure = treatment, family = "binomial",
+                        link = "logit", 
+                        denominator = ~ age + female + meanbp1 + ARF +
+                          CHF + Cirr + colcan + Coma + lungcan + MOSF + 
+                          sepsis + aps, data = dat, 
+*                       trunc = 0.01)
+
+```
+]
+
+---
+class: middle
+
+## Truncate by percentile
+
+.small[
+
+]
+
+.small[
+
+```r
+summary(weightmodel$weights.trun)
+```
+
+```
+##    Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
+##   1.080   1.374   1.682   1.966   2.238   6.345
+```
+]
+
+
+.small[
+
+```r
+# get risk difference
+dat$wt &lt;- weightmodel$weights.trun
+svyglm.obj &lt;- (svyglm(died ~ treatment, 
+                      design = svydesign(~ 1, weights = ~wt, data = dat)))
+coef(svyglm.obj)
+```
+
+```
+## (Intercept)   treatment 
+##  0.64038202  0.03119643
+```
+
+```r
+confint(svyglm.obj)
+```
+
+```
+##                   2.5 %     97.5 %
+## (Intercept) 0.623921869 0.65684218
+## treatment   0.004013786 0.05837907
+```
+]
+
+---
+class: inverse, bottom
+background-image: url("./fig/truncatedWeights.png")
+background-position: 50% 50%
+background-size: contain
+
+
+.small[
+
+]
+
+
+---
+class: inverse, center, middle
+
+# Test for unobserved covariates
+
+---
+class: middle
+
+## Example 1 (Correct model)
+
+.small[
+
+```r
+psmodel &lt;- glm(treatment ~ age + female + meanbp1 + ARF + 
+                 CHF + Cirr + colcan + Coma + lungcan + 
+                 MOSF + sepsis + aps, family = binomial(link = "logit"), 
+               data = dat)
+
+ps &lt;- predict(psmodel, type = "response")
+
+dat["residuals"] &lt;- residuals.glm(psmodel)
+
+dat &lt;- dat %&gt;%
+  mutate(id_num = 1:n())
+
+m.out &lt;- MatchIt::matchit(treatment ~ age + female + meanbp1 + ARF + 
+                 CHF + Cirr + colcan + Coma + lungcan + 
+                 MOSF + sepsis + aps, data = dat, 
+                 method = "nearest", distance = "logit", caliper = 0.2)
+```
+]
+
+
+---
+class: middle
+
+## Manipulation
+
+.small[
+
+```r
+a &lt;- data.frame(dat$id_num, m.out$treat, m.out$weights)
+colnames(a) &lt;- c("id_num", "trt", "weights")
+
+# datafile of matches
+b &lt;- as.data.frame(m.out$match.matrix)
+colnames(b) &lt;- c("matched_unit")
+b$matched_unit &lt;- as.numeric(as.character(b$matched_unit))
+b$treated_unit &lt;- as.numeric(rownames(b))
+# now delete matches=na
+c &lt;- b[!is.na(b$matched_unit), ]
+c$match_num &lt;- 1:dim(c)[1]
+
+# attach match number to large datafile
+a[c$matched_unit, 4] &lt;- c$match_num
+a[c$treated_unit, 4] &lt;- c$match_num
+colnames(a)[4] &lt;- "match_num"
+
+final_dat &lt;- dat %&gt;%
+  dplyr::select(-id_num) %&gt;%
+  cbind(a) %&gt;%
+  filter(!(is.na(a$match_num)))
+```
+]
+
+
+---
+class: middle
+
+## Hausman test
+
+.small[
+
+```r
+# Hausman test
+
+final_dat &lt;- final_dat %&gt;%
+  dplyr::mutate(dead = if_else(death == "No", 0, 1))
+
+outcomemodel &lt;- survival::clogit(dead ~ age + female + meanbp1 + ARF +
+  CHF + Cirr + Coma + lungcan +
+  MOSF + sepsis + aps + strata(match_num) + residuals,
+data = final_dat)
+
+covariance &lt;- diag(vcov(outcomemodel))
+covariance &lt;- covariance[length(covariance)]
+
+coefficient &lt;- coef(outcomemodel)[length(coef(outcomemodel))]
+
+z_stat &lt;- coefficient / sqrt(covariance)
+p_values &lt;- pchisq(z_stat^2, 1, lower.tail = FALSE)
+names(p_values)=NULL
+cat(paste0("P value: ",round(p_values,digit=4)))
+```
+]
+
+.small[
+```
+# P value: 0.8558
+```
+]
+
+???
+We cannot reject the null hypothesis, and hence we cannot invalidate the absence of confounders.
+
+
+---
+class: middle 
+
+## Example 2 (Residual confounders - Extreme example)
+
+.small[
+
+
+```r
+#Propensity score
+psmodel &lt;- glm(treatment ~ age,
+                  family = binomial(link = "logit"),
+                  data = dat)
+
+ps &lt;- predict(psmodel, type = "response")
+
+dat["residuals"] &lt;- residuals.glm(psmodel)
+
+dat &lt;- dat %&gt;%
+  mutate(id_num = 1:n())
+
+m.out &lt;- MatchIt::matchit(treatment ~ age,
+data = dat, method = "nearest", distance = "logit", caliper = 0.2
+)
+```
+]
+
+
+---
+class: middle
+
+## Manipulation
+
+.small[
+
+```r
+a &lt;- data.frame(dat$id_num, m.out$treat, m.out$weights)
+colnames(a) &lt;- c("id_num", "trt", "weights")
+
+# datafile of matches
+b &lt;- as.data.frame(m.out$match.matrix)
+colnames(b) &lt;- c("matched_unit")
+b$matched_unit &lt;- as.numeric(as.character(b$matched_unit))
+b$treated_unit &lt;- as.numeric(rownames(b))
+# now delete matches=na
+c &lt;- b[!is.na(b$matched_unit), ]
+c$match_num &lt;- 1:dim(c)[1]
+
+# attach match number to large datafile
+a[c$matched_unit, 4] &lt;- c$match_num
+a[c$treated_unit, 4] &lt;- c$match_num
+colnames(a)[4] &lt;- "match_num"
+
+final_dat &lt;- dat %&gt;%
+  dplyr::select(-id_num) %&gt;%
+  cbind(a) %&gt;%
+  filter(!(is.na(a$match_num)))
+```
+]
+
+---
+class: middle
+
+## Hausman test
+
+.small[
+
+```r
+# Hausman test
+library(survival)
+final_dat &lt;- final_dat %&gt;%
+  mutate(dead = ifelse(death == "No", 0, 1))
+
+outcomemodel &lt;- survival::clogit(dead ~ age + strata(match_num) + residuals,
+data = final_dat
+)
+
+covariance &lt;- diag(vcov(outcomemodel))
+covariance &lt;- covariance[length(covariance)]
+
+coefficient &lt;- coef(outcomemodel)[length(coef(outcomemodel))]
+
+z_stat &lt;- coefficient / sqrt(covariance)
+p_values &lt;- pchisq(z_stat^2, 1, lower.tail = FALSE)
+names(p_values)=NULL
+
+cat(paste0("P value: ",formatC(p_values,format="e",digits=2)))
+```
+]
+
+.small[
+```
+# P value: 1.93e-02
+```
+]
+
+
+???
+In this case, we reject the null hypothesis `\(H_0:\delta=0\)`, and conclude about the presence of confounders.
+
+---
+class: middle 
+
+# Reading list
+
+1. 5 misunderstandings about propensity score &lt;br&gt; [PSに関する5つの誤解](https://healthpolicyhealthecon.com/2015/05/07/propensity-score-2/)
+
+2. Causal inference in Statistics,  [統計学における因果推論（ルービンの因果モデル）](https://healthpolicyhealthecon.com/2014/11/30/rubin_causal_model/)
+
+3. Tableone package has many useful code for tables and figures: [https://cran.r-project.org/web/packages/tableone/vignettes/smd.html](https://cran.r-project.org/web/packages/tableone/vignettes/smd.html)
+
+4. `rcbalance` package has many more matching options: [https://obsstudies.org/wp-content/uploads/2017/06/rcbalance_paper_v7r2.pdf](https://obsstudies.org/wp-content/uploads/2017/06/rcbalance_paper_v7r2.pdf)
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"highlightSpans": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function(time) {
+  var d2 = function(number) {
+    return ('0' + number).slice(-2); // left-pad 0 to minutes/seconds
+  },
+
+  time_format = function(total) {
+    var secs = Math.abs(total) / 1000;
+    var h = Math.floor(secs / 3600);
+    var m = Math.floor(secs % 3600 / 60);
+    var s = Math.round(secs % 60);
+    var res = d2(m) + ':' + d2(s);
+    if (h > 0) res = h + ':' + res;
+    return res;  // [hh:]mm:ss
+  },
+
+  slide_number_div = function(i) {
+    return document.getElementsByClassName('remark-slide-number').item(i);
+  },
+
+  current_page_number = function(i) {
+    return slide_number_div(i).firstChild.textContent;  // text "i / N"
+  };
+
+  var timer = document.createElement('span'); timer.id = 'slide-time-left';
+  var time_left = time, k = slideshow.getCurrentSlideIndex(),
+      last_page_number = current_page_number(k);
+
+  setInterval(function() {
+    time_left = time_left - 1000;
+    timer.innerHTML = ' ' + time_format(time_left);
+    if (time_left < 0) timer.style.color = 'red';
+  }, 1000);
+
+  slide_number_div(k).appendChild(timer);
+
+  slideshow.on('showSlide', function(slide) {
+    var i = slide.getSlideIndex(), n = current_page_number(i);
+    // reset timer when a new slide is shown and the page number is changed
+    if (last_page_number !== n) {
+      time_left = time; last_page_number = n;
+      timer.innerHTML = ' ' + time_format(time); timer.style.color = null;
+    }
+    slide_number_div(i).appendChild(timer);
+  });
+})(60000);
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>
